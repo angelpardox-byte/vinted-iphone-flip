@@ -39,6 +39,12 @@ MANUAL_THRESHOLDS = {
 # Mínimo de anuncios históricos en el grupo antes de confiar en la media
 MIN_SAMPLES_FOR_AVG = 5
 
+# ── Filtro de vendedor ────────────────────────────────────────────────────
+# Antes de notificar un chollo, comprobamos el perfil del vendedor para
+# evitar cuentas nuevas o sospechosas sin historial de ventas.
+MIN_SELLER_ITEMS_SOLD = 1      # ha de haber vendido al menos 1 artículo antes
+MIN_SELLER_REPUTATION = 0.8    # % de valoraciones positivas (0-1), solo si tiene reseñas
+
 # Ignora anuncios claramente rotos/despiece que distorsionan la media
 MIN_PRICE_SANITY = 60      # € — por debajo de esto se asume pantalla rota / piezas
 EXCLUDE_KEYWORDS = ["piezas", "roto", "no enciende", "para repuestos", "estropeado"]

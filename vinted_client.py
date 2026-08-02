@@ -72,6 +72,7 @@ class VintedClient:
     @staticmethod
     def _normalize(raw: dict) -> dict:
         price_obj = raw.get("price", {}) or raw.get("total_item_price", {})
+        user = raw.get("user") or {}
         return {
             "id": raw.get("id"),
             "title": raw.get("title", ""),
@@ -81,5 +82,32 @@ class VintedClient:
             "photo_url": (raw.get("photo") or {}).get("url", ""),
             "brand": (raw.get("brand_title") or ""),
             "condition": raw.get("status", ""),  # "Nuevo", "Muy bueno", etc.
-            "seller_login": (raw.get("user") or {}).get("login", ""),
+            "seller_id": user.get("id"),
+            "seller_login": user.get("login", ""),
+        }
+
+    def get_seller_stats(self, seller_id):
+        """
+        Consulta el perfil del vendedor para saber si tiene historial de
+        ventas y su reputación. Devuelve None si no se puede verificar
+        (anuncio eliminado, error de red, bloqueo temporal, etc.).
+        """
+        if not seller_id:
+            return None
+
+        url = f"{VINTED_DOMAIN}/api/v2/users/{seller_id}"
+        try:
+            resp = self.session.get(url, timeout=15)
+            if resp.status_code in (401, 403):
+                self._warm_up()
+                resp = self.session.get(url, timeout=15)
+            resp.raise_for_status()
+            user = resp.json().get("user", {})
+        except (requests.RequestException, ValueError):
+            return None
+
+        return {
+            "items_sold": user.get("given_item_count", 0) or 0,
+            "feedback_count": user.get("feedback_count", 0) or 0,
+            "reputation": user.get("feedback_reputation"),
         }

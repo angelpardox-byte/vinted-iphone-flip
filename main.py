@@ -16,7 +16,7 @@ import time
 import traceback
 from datetime import datetime
 
-from config import MODELS, SEARCH_INTERVAL_SECONDS
+from config import MODELS, SEARCH_INTERVAL_SECONDS, MIN_SELLER_ITEMS_SOLD, MIN_SELLER_REPUTATION
 from vinted_client import VintedClient
 from storage import get_connection, already_seen, save_listing, get_average_price
 from analyzer import evaluate_listing
@@ -25,6 +25,26 @@ from notifier import send_telegram_message, format_deal_message
 
 def log(msg: str):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
+
+
+def seller_is_trustworthy(client: VintedClient, listing: dict) -> bool:
+    """
+    Comprueba que el vendedor tenga historial de ventas y buena reputación
+    antes de avisar de un chollo. Si no se puede verificar (error de red,
+    perfil no disponible), se descarta el aviso por precaución.
+    """
+    stats = client.get_seller_stats(listing.get("seller_id"))
+    if stats is None:
+        return False
+
+    if stats["items_sold"] < MIN_SELLER_ITEMS_SOLD:
+        return False
+
+    if stats["feedback_count"] > 0 and stats["reputation"] is not None:
+        if stats["reputation"] < MIN_SELLER_REPUTATION:
+            return False
+
+    return True
 
 
 def run_once(client: VintedClient, conn):
@@ -52,12 +72,21 @@ def run_once(client: VintedClient, conn):
                              listing["price"], listing["title"], listing["url"])
                 continue
 
+            notify = False
+            if verdict["is_deal"]:
+                if seller_is_trustworthy(client, listing):
+                    notify = True
+                else:
+                    log(f"Chollo descartado por vendedor sin historial fiable: "
+                        f"{verdict['model']} {verdict['storage']} a {listing['price']}€ "
+                        f"({listing.get('seller_login', '?')})")
+
             save_listing(conn, listing["id"], verdict["model"], verdict["storage"],
                          listing["price"], listing["title"], listing["url"],
-                         notified=verdict["is_deal"])
+                         notified=notify)
             total_new += 1
 
-            if verdict["is_deal"]:
+            if notify:
                 total_deals += 1
                 msg = format_deal_message(listing, verdict)
                 send_telegram_message(msg)
