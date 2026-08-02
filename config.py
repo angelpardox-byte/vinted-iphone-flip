@@ -1,0 +1,52 @@
+"""
+Configuración central del bot de detección de chollos de iPhone en Vinted.
+Ajusta aquí modelos, umbrales y credenciales.
+"""
+import os
+
+# ── Telegram ──────────────────────────────────────────────────────────────
+# Usa variables de entorno para no dejar el token en el código.
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")  # tu token de ChollosIphone_Bot
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")      # tu chat_id (usa /getUpdates para obtenerlo)
+
+# ── Modelos a monitorizar ─────────────────────────────────────────────────
+# Vinted permite buscar por texto libre; generamos variantes de búsqueda
+# para cada modelo y capacidad.
+MODELS = [
+    "iPhone 12", "iPhone 12 mini", "iPhone 12 Pro", "iPhone 12 Pro Max",
+    "iPhone 13", "iPhone 13 mini", "iPhone 13 Pro", "iPhone 13 Pro Max",
+    "iPhone 14", "iPhone 14 Plus", "iPhone 14 Pro", "iPhone 14 Pro Max",
+    "iPhone 15", "iPhone 15 Plus", "iPhone 15 Pro", "iPhone 15 Pro Max",
+    "iPhone 16", "iPhone 16 Plus", "iPhone 16 Pro", "iPhone 16 Pro Max",
+]
+
+STORAGE_VARIANTS = ["64GB", "128GB", "256GB", "512GB", "1TB"]
+
+# ── Detección de gangas ───────────────────────────────────────────────────
+# Un anuncio se considera "chollo" si cumple CUALQUIERA de estas condiciones:
+#   1. Precio >= PCT_BELOW_AVG por debajo de la media móvil del grupo
+#      (mismo modelo + capacidad + rango de estado)
+#   2. Precio por debajo del umbral manual definido en MANUAL_THRESHOLDS
+PCT_BELOW_AVG = 0.20  # 20% por debajo de la media = chollo
+
+# Umbrales manuales opcionales por modelo (clave = "iPhone 13 Pro|128GB")
+# Si no defines uno para una combinación, solo se usa el criterio de media móvil.
+MANUAL_THRESHOLDS = {
+    # "iPhone 13 Pro|128GB": 350,
+    # "iPhone 14|256GB": 380,
+}
+
+# Mínimo de anuncios históricos en el grupo antes de confiar en la media
+MIN_SAMPLES_FOR_AVG = 5
+
+# Ignora anuncios claramente rotos/despiece que distorsionan la media
+MIN_PRICE_SANITY = 60      # € — por debajo de esto se asume pantalla rota / piezas
+EXCLUDE_KEYWORDS = ["piezas", "roto", "no enciende", "para repuestos", "estropeado"]
+
+# ── Scraping ──────────────────────────────────────────────────────────────
+SEARCH_INTERVAL_SECONDS = 90       # cada cuánto relanza las búsquedas
+REQUEST_DELAY_SECONDS = 3          # pausa entre requests para no saturar/parecer bot
+VINTED_DOMAIN = "https://www.vinted.es"
+
+# ── Persistencia ──────────────────────────────────────────────────────────
+DB_PATH = os.path.join(os.path.dirname(__file__), "data", "listings.db")
