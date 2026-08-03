@@ -48,14 +48,24 @@ _ACCESSORY_RE = re.compile(
 
 
 def is_suspicious(listing: dict) -> bool:
+    """Precio irrisorio o palabras de mal estado: se descarta siempre,
+    aunque el título deje clara la capacidad (un iPhone roto sigue siendo
+    un iPhone roto aunque diga "128GB")."""
     title = listing["title"].lower()
     if listing["price"] < MIN_PRICE_SANITY:
         return True
     if any(kw in title for kw in EXCLUDE_KEYWORDS):
         return True
-    if _ACCESSORY_RE.search(title):
-        return True
     return False
+
+
+def looks_like_accessory_only(title: str) -> bool:
+    """Solo tiene sentido comprobar esto cuando NO se ha detectado capacidad:
+    si el título dice "128GB" (o similar), es casi seguro el móvil real —
+    los accesorios no tienen capacidad de almacenamiento — así que un
+    anuncio tipo "iPhone 13 128GB + funda de regalo" nunca debe descartarse
+    por contener la palabra "funda"."""
+    return bool(_ACCESSORY_RE.search(title))
 
 
 def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_price_by_model_fn=None):
@@ -79,7 +89,10 @@ def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_pric
 
     storage = extract_storage(listing["title"])
     storage_known = storage is not None
+
     if not storage_known:
+        if looks_like_accessory_only(listing["title"]):
+            return None
         storage = "Sin especificar"
 
     if storage_known:
