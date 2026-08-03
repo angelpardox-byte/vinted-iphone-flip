@@ -16,11 +16,15 @@ import time
 import traceback
 from datetime import datetime
 
-from config import MODELS, SEARCH_INTERVAL_SECONDS, MIN_SELLER_ITEMS_SOLD, MIN_SELLER_REPUTATION
+from config import (
+    MODELS, SEARCH_INTERVAL_SECONDS, MIN_SELLER_ITEMS_SOLD,
+    MIN_SELLER_REPUTATION, MAX_AI_CALLS_PER_RUN,
+)
 from vinted_client import VintedClient
 from storage import get_connection, already_seen, save_listing, get_average_price, get_average_price_by_model
 from analyzer import evaluate_listing
 from notifier import send_telegram_message, format_deal_message
+from ai_reviewer import judge_ambiguous_listing
 
 
 def log(msg: str):
@@ -47,9 +51,24 @@ def seller_is_trustworthy(client: VintedClient, listing: dict) -> bool:
     return True
 
 
+def make_ai_judge():
+    """Envuelve judge_ambiguous_listing con un tope duro de llamadas por
+    pasada, para que un pico de anuncios ambiguos nunca dispare el gasto."""
+    calls_made = {"n": 0}
+
+    def judge(listing):
+        if calls_made["n"] >= MAX_AI_CALLS_PER_RUN:
+            return None
+        calls_made["n"] += 1
+        return judge_ambiguous_listing(listing)
+
+    return judge
+
+
 def run_once(client: VintedClient, conn):
     total_new = 0
     total_deals = 0
+    ai_judge = make_ai_judge()
 
     for model in MODELS:
         try:
@@ -62,7 +81,7 @@ def run_once(client: VintedClient, conn):
             if not listing["id"] or already_seen(conn, listing["id"]):
                 continue
 
-            verdict = evaluate_listing(conn, listing, get_average_price, get_average_price_by_model)
+            verdict = evaluate_listing(conn, listing, get_average_price, get_average_price_by_model, ai_judge)
 
             if verdict is None:
                 # No reconocible como iPhone/capacidad válida: igualmente

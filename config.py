@@ -65,8 +65,18 @@ ACCESSORY_KEYWORDS = [
 
 # Margen de descuento adicional exigido cuando no se pudo identificar la
 # capacidad exacta (se compara contra una media menos precisa, mezclando
-# todas las capacidades del modelo).
+# todas las capacidades del modelo). Solo se usa como respaldo si la IA
+# no está disponible (ver más abajo).
 EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE = 0.10
+
+# ── Revisión con IA para anuncios ambiguos ──────────────────────────────────
+# Para anuncios sin capacidad detectada pero con precio ya prometedor, en
+# vez de aplicar el margen extra a ciegas, se le pregunta a Claude si de
+# verdad parece el móvil real (y no un accesorio/pieza/anuncio dudoso).
+# Si no hay clave configurada, se usa el margen extra de arriba como respaldo.
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
+MAX_AI_CALLS_PER_RUN = 8   # tope duro de consultas a la IA por cada pasada
 
 # ── Scraping ──────────────────────────────────────────────────────────────
 SEARCH_INTERVAL_SECONDS = 90       # cada cuánto relanza las búsquedas
