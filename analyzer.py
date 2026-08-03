@@ -9,6 +9,7 @@ import re
 from config import (
     MODELS, STORAGE_VARIANTS, PCT_BELOW_AVG, MANUAL_THRESHOLDS,
     MIN_SAMPLES_FOR_AVG, MIN_PRICE_SANITY, EXCLUDE_KEYWORDS,
+    ACCESSORY_KEYWORDS, EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE,
 )
 
 # Modelos ordenados de más largo a más corto para no confundir
@@ -40,11 +41,19 @@ def extract_storage(title: str):
     return candidate if candidate in STORAGE_VARIANTS else None
 
 
+_ACCESSORY_RE = re.compile(
+    r"\b(" + "|".join(re.escape(kw) for kw in ACCESSORY_KEYWORDS) + r")\b",
+    re.IGNORECASE,
+)
+
+
 def is_suspicious(listing: dict) -> bool:
     title = listing["title"].lower()
     if listing["price"] < MIN_PRICE_SANITY:
         return True
     if any(kw in title for kw in EXCLUDE_KEYWORDS):
+        return True
+    if _ACCESSORY_RE.search(title):
         return True
     return False
 
@@ -85,9 +94,11 @@ def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_pric
     reasons = []
     is_deal = False
 
+    required_discount = PCT_BELOW_AVG if storage_known else PCT_BELOW_AVG + EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE
+
     if sample_size >= MIN_SAMPLES_FOR_AVG and avg_price > 0:
         discount = 1 - (price / avg_price)
-        if discount >= PCT_BELOW_AVG:
+        if discount >= required_discount:
             is_deal = True
             reason = f"{discount:.0%} por debajo de la media ({avg_price:.0f}€)"
             if not storage_known:

@@ -52,6 +52,22 @@ EXCLUDE_KEYWORDS = [
     "dañad", "bloqueado", "mal estado",
 ]
 
+# Accesorios que mencionan el modelo en el título pero no son el móvil en sí
+# (fundas, cargadores, soportes...). Sin esto, un accesorio barato se puede
+# confundir con un "chollo" del móvil real cuando no menciona capacidad.
+ACCESSORY_KEYWORDS = [
+    "funda", "fundas", "carcasa", "carcasas", "protector de pantalla",
+    "cristal templado", "cargador", "cargadores", "cable", "adaptador",
+    "soporte", "correa", "mica", "power bank", "batería externa",
+    "case", "cover", "screen protector", "charger", "power bank",
+    "coque", "chargeur", "verre trempé",
+]
+
+# Margen de descuento adicional exigido cuando no se pudo identificar la
+# capacidad exacta (se compara contra una media menos precisa, mezclando
+# todas las capacidades del modelo).
+EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE = 0.10
+
 # ── Scraping ──────────────────────────────────────────────────────────────
 SEARCH_INTERVAL_SECONDS = 90       # cada cuánto relanza las búsquedas
 REQUEST_DELAY_SECONDS = 3          # pausa entre requests para no saturar/parecer bot
