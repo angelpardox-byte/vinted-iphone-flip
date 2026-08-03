@@ -29,6 +29,10 @@ STORAGE_VARIANTS = ["64GB", "128GB", "256GB", "512GB", "1TB"]
 #   2. Precio por debajo del umbral manual definido en MANUAL_THRESHOLDS
 PCT_BELOW_AVG = 0.20  # 20% por debajo de la media = chollo
 
+# A partir de este descuento, el mensaje de Telegram destaca el anuncio
+# como "SUPER CHOLLO" para que resalte frente al resto de avisos.
+SUPER_DEAL_DISCOUNT = 0.35  # 35% por debajo de la media = super chollo
+
 # Umbrales manuales opcionales por modelo (clave = "iPhone 13 Pro|128GB")
 # Si no defines uno para una combinación, solo se usa el criterio de media móvil.
 MANUAL_THRESHOLDS = {

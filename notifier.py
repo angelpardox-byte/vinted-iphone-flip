@@ -2,7 +2,7 @@
 Envío de notificaciones por Telegram usando el bot ChollosIphone_Bot.
 """
 import requests
-from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, SUPER_DEAL_DISCOUNT
 
 
 def send_telegram_message(text: str):
@@ -26,8 +26,12 @@ def send_telegram_message(text: str):
 
 
 def format_deal_message(listing: dict, verdict: dict) -> str:
+    discount = verdict.get("discount")
+    is_super = discount is not None and discount >= SUPER_DEAL_DISCOUNT
+    header = "🚨🚨 <b>SUPER CHOLLO</b> 🚨🚨" if is_super else "🔥 <b>CHOLLO DETECTADO</b>"
+
     return (
-        f"🔥 <b>CHOLLO DETECTADO</b>\n\n"
+        f"{header}\n\n"
         f"📱 {verdict['model']} {verdict['storage']}\n"
         f"💰 Precio: <b>{listing['price']:.0f}€</b>\n"
         f"📊 Media del grupo: {verdict['avg_price']:.0f}€ "

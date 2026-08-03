@@ -155,9 +155,11 @@ def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_pric
 
     reasons = []
     is_deal = False
+    discount_pct = None
 
     if sample_size >= MIN_SAMPLES_FOR_AVG and avg_price > 0:
         discount = 1 - (price / avg_price)
+        discount_pct = discount
 
         if storage_known:
             if discount >= PCT_BELOW_AVG:
@@ -207,4 +209,5 @@ def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_pric
         "storage": storage,
         "avg_price": avg_price,
         "sample_size": sample_size,
+        "discount": discount_pct,
     }
