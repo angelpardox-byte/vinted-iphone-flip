@@ -2,7 +2,7 @@ name: Chollos iPhone Bot
 
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "2-59/10 * * * *"
   workflow_dispatch: {}
 
 permissions:
