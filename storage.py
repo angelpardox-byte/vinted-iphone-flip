@@ -53,6 +53,22 @@ def get_average_price(conn, model: str, storage: str):
     return (avg or 0.0), (count or 0)
 
 
+def get_average_price_by_model(conn, model: str):
+    """
+    Media de precio para un modelo agregando todas las capacidades conocidas
+    (excluye entradas sin capacidad identificada, para no mezclar bases
+    comparables distintas). Se usa cuando el título de un anuncio no deja
+    clara la capacidad.
+    """
+    cur = conn.execute(
+        "SELECT AVG(price), COUNT(*) FROM listings "
+        "WHERE model = ? AND storage != 'Sin especificar' AND storage != 'desconocido'",
+        (model,),
+    )
+    avg, count = cur.fetchone()
+    return (avg or 0.0), (count or 0)
+
+
 def mark_notified(conn, listing_id: str):
     conn.execute("UPDATE listings SET notified = 1 WHERE id = ?", (str(listing_id),))
     conn.commit()

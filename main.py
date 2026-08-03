@@ -18,7 +18,7 @@ from datetime import datetime
 
 from config import MODELS, SEARCH_INTERVAL_SECONDS, MIN_SELLER_ITEMS_SOLD, MIN_SELLER_REPUTATION
 from vinted_client import VintedClient
-from storage import get_connection, already_seen, save_listing, get_average_price
+from storage import get_connection, already_seen, save_listing, get_average_price, get_average_price_by_model
 from analyzer import evaluate_listing
 from notifier import send_telegram_message, format_deal_message
 
@@ -62,7 +62,7 @@ def run_once(client: VintedClient, conn):
             if not listing["id"] or already_seen(conn, listing["id"]):
                 continue
 
-            verdict = evaluate_listing(conn, listing, get_average_price)
+            verdict = evaluate_listing(conn, listing, get_average_price, get_average_price_by_model)
 
             if verdict is None:
                 # No reconocible como iPhone/capacidad válida: igualmente

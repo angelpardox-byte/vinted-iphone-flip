@@ -47,7 +47,10 @@ MIN_SELLER_REPUTATION = 0.8    # % de valoraciones positivas (0-1), solo si tien
 
 # Ignora anuncios claramente rotos/despiece que distorsionan la media
 MIN_PRICE_SANITY = 60      # € — por debajo de esto se asume pantalla rota / piezas
-EXCLUDE_KEYWORDS = ["piezas", "roto", "no enciende", "para repuestos", "estropeado"]
+EXCLUDE_KEYWORDS = [
+    "piezas", "roto", "no enciende", "para repuestos", "estropeado",
+    "dañad", "bloqueado", "mal estado",
+]
 
 # ── Scraping ──────────────────────────────────────────────────────────────
 SEARCH_INTERVAL_SECONDS = 90       # cada cuánto relanza las búsquedas

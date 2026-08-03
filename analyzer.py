@@ -18,18 +18,26 @@ _MODELS_SORTED = sorted(MODELS, key=len, reverse=True)
 
 def extract_model(title: str):
     t = title.lower()
+    compact = t.replace(" ", "")
     for model in _MODELS_SORTED:
-        if model.lower() in t:
+        m = model.lower()
+        if m in t or m.replace(" ", "") in compact:
             return model
     return None
 
 
+# Acepta variantes mal escritas o con otra unidad: "128 GB", "128GB", "128Gb",
+# "128 gigas", "128GIGAS", "1 TB", "1TERA"...
+_STORAGE_RE = re.compile(r"(\d+)\s*(TB|TERA|GB|GIGAS?|GIGABYTES?)\b", re.IGNORECASE)
+
+
 def extract_storage(title: str):
-    t = title.upper().replace(" ", "")
-    for variant in STORAGE_VARIANTS:
-        if variant in t:
-            return variant
-    return None
+    match = _STORAGE_RE.search(title)
+    if not match:
+        return None
+    number, unit = match.group(1), match.group(2).upper()
+    candidate = f"{number}TB" if unit in ("TB", "TERA") else f"{number}GB"
+    return candidate if candidate in STORAGE_VARIANTS else None
 
 
 def is_suspicious(listing: dict) -> bool:
@@ -41,22 +49,37 @@ def is_suspicious(listing: dict) -> bool:
     return False
 
 
-def evaluate_listing(conn, listing: dict, get_average_price_fn):
+def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_price_by_model_fn=None):
     """
     Devuelve un dict con el veredicto:
       {"is_deal": bool, "reason": str, "model": str, "storage": str,
        "avg_price": float, "sample_size": int}
     o None si el anuncio no se pudo clasificar (no es iPhone reconocible).
+
+    Si el título no deja claro la capacidad (mal escrita, abreviada, o
+    simplemente no la menciona), no se descarta el anuncio: se compara
+    contra la media general del modelo (todas las capacidades) usando
+    get_average_price_by_model_fn, si se proporciona.
     """
     if is_suspicious(listing):
         return None
 
     model = extract_model(listing["title"])
-    storage = extract_storage(listing["title"])
-    if not model or not storage:
+    if not model:
         return None
 
-    avg_price, sample_size = get_average_price_fn(conn, model, storage)
+    storage = extract_storage(listing["title"])
+    storage_known = storage is not None
+    if not storage_known:
+        storage = "Sin especificar"
+
+    if storage_known:
+        avg_price, sample_size = get_average_price_fn(conn, model, storage)
+    elif get_average_price_by_model_fn:
+        avg_price, sample_size = get_average_price_by_model_fn(conn, model)
+    else:
+        avg_price, sample_size = 0.0, 0
+
     price = listing["price"]
 
     reasons = []
@@ -66,7 +89,10 @@ def evaluate_listing(conn, listing: dict, get_average_price_fn):
         discount = 1 - (price / avg_price)
         if discount >= PCT_BELOW_AVG:
             is_deal = True
-            reasons.append(f"{discount:.0%} por debajo de la media ({avg_price:.0f}€)")
+            reason = f"{discount:.0%} por debajo de la media ({avg_price:.0f}€)"
+            if not storage_known:
+                reason += " — capacidad no confirmada en el título"
+            reasons.append(reason)
 
     manual_key = f"{model}|{storage}"
     if manual_key in MANUAL_THRESHOLDS and price <= MANUAL_THRESHOLDS[manual_key]:
