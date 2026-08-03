@@ -92,36 +92,55 @@ def looks_like_accessory_only(title: str) -> bool:
     return bool(_ACCESSORY_RE.search(title))
 
 
-def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_price_by_model_fn=None, ai_judge_fn=None):
+def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_price_by_model_fn=None,
+                      ai_judge_fn=None, searched_model=None):
     """
     Devuelve un dict con el veredicto:
       {"is_deal": bool, "reason": str, "model": str, "storage": str,
        "avg_price": float, "sample_size": int}
     o None si el anuncio no se pudo clasificar (no es iPhone reconocible).
 
-    Si el título no deja claro la capacidad (mal escrita, abreviada, o
-    simplemente no la menciona), no se descarta el anuncio: se compara
-    contra la media general del modelo (todas las capacidades) usando
-    get_average_price_by_model_fn, si se proporciona.
+    Dos situaciones ambiguas se resuelven con ai_judge_fn en vez de
+    descartar el anuncio a ciegas:
 
-    Para ese caso de capacidad desconocida, si el precio ya parece un
-    chollo (>= PCT_BELOW_AVG) y se proporciona ai_judge_fn, se le
-    consulta a la IA si de verdad parece el móvil real antes de confiar
-    en el resultado. Si ai_judge_fn no está disponible o falla (None),
-    se usa como respaldo el margen extra EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE.
+    1. El título no menciona ningún modelo reconocible (erratas, jerga,
+       orden raro de palabras). En vez de descartarlo, se le pregunta a
+       la IA si de verdad es el modelo que se estaba buscando en Vinted
+       (searched_model) y, si puede, qué capacidad tiene.
+    2. El modelo sí se reconoce pero la capacidad no. Se compara contra
+       la media general del modelo (get_average_price_by_model_fn) y, si
+       el precio ya parece un chollo, se le pregunta a la IA si de
+       verdad es el móvil real antes de confiar en el resultado.
+
+    Si ai_judge_fn no está disponible o falla (None), se usa como
+    respaldo el margen extra EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE (y en el
+    caso 1, sin IA disponible, se sigue descartando como hasta ahora).
     """
     if is_suspicious(listing):
         return None
 
     model = extract_model(listing["title"])
-    if not model:
-        return None
+    ai_confirmed = False
 
-    storage = extract_storage(listing["title"])
+    if model is None:
+        # Ni siquiera se reconoce el modelo por texto: solo con ayuda de
+        # la IA (usando el modelo que se estaba buscando como contexto)
+        # se puede seguir evaluando en vez de descartar sin más.
+        if not searched_model or not ai_judge_fn:
+            return None
+        ai_result = ai_judge_fn(listing, searched_model)
+        if not ai_result or not ai_result.get("is_phone"):
+            return None
+        model = searched_model
+        storage = ai_result.get("storage")
+        ai_confirmed = True
+    else:
+        storage = extract_storage(listing["title"])
+
     storage_known = storage is not None
 
     if not storage_known:
-        if looks_like_accessory_only(listing["title"]):
+        if not ai_confirmed and looks_like_accessory_only(listing["title"]):
             return None
         storage = "Sin especificar"
 
@@ -143,26 +162,38 @@ def evaluate_listing(conn, listing: dict, get_average_price_fn, get_average_pric
         if storage_known:
             if discount >= PCT_BELOW_AVG:
                 is_deal = True
-                reasons.append(f"{discount:.0%} por debajo de la media ({avg_price:.0f}€)")
+                reason = f"{discount:.0%} por debajo de la media ({avg_price:.0f}€)"
+                if ai_confirmed:
+                    reason += " — título poco claro, verificado por IA"
+                reasons.append(reason)
 
         elif discount >= PCT_BELOW_AVG:
-            # Capacidad desconocida pero precio ya prometedor: candidato
-            # ambiguo. Se le pregunta a la IA si de verdad es el móvil.
-            ai_verdict = ai_judge_fn(listing) if ai_judge_fn else None
-
-            if ai_verdict is True:
-                is_deal = True
-                reasons.append(
-                    f"{discount:.0%} por debajo de la media ({avg_price:.0f}€) "
-                    "— capacidad no confirmada, verificado por IA"
-                )
-            elif ai_verdict is None and discount >= PCT_BELOW_AVG + EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE:
-                # Sin IA disponible (o falló): respaldo con margen extra.
-                is_deal = True
-                reasons.append(
-                    f"{discount:.0%} por debajo de la media ({avg_price:.0f}€) "
-                    "— capacidad no confirmada en el título"
-                )
+            # Capacidad desconocida pero precio ya prometedor.
+            if ai_confirmed:
+                # La IA ya confirmó que es el móvil real (caso 1); con
+                # capacidad desconocida seguimos exigiendo el margen
+                # extra por prudencia en la comparación de precio.
+                if discount >= PCT_BELOW_AVG + EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE:
+                    is_deal = True
+                    reasons.append(
+                        f"{discount:.0%} por debajo de la media ({avg_price:.0f}€) "
+                        "— título poco claro, verificado por IA"
+                    )
+            else:
+                ai_verdict = ai_judge_fn(listing, model) if ai_judge_fn else None
+                if ai_verdict and ai_verdict.get("is_phone"):
+                    is_deal = True
+                    reasons.append(
+                        f"{discount:.0%} por debajo de la media ({avg_price:.0f}€) "
+                        "— capacidad no confirmada, verificado por IA"
+                    )
+                elif ai_verdict is None and discount >= PCT_BELOW_AVG + EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE:
+                    # Sin IA disponible (o falló): respaldo con margen extra.
+                    is_deal = True
+                    reasons.append(
+                        f"{discount:.0%} por debajo de la media ({avg_price:.0f}€) "
+                        "— capacidad no confirmada en el título"
+                    )
 
     manual_key = f"{model}|{storage}"
     if manual_key in MANUAL_THRESHOLDS and price <= MANUAL_THRESHOLDS[manual_key]:
