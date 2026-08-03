@@ -47,6 +47,10 @@ MIN_SELLER_REPUTATION = 0.8    # % de valoraciones positivas (0-1), solo si tien
 
 # Ignora anuncios claramente rotos/despiece que distorsionan la media
 MIN_PRICE_SANITY = 60      # € — por debajo de esto se asume pantalla rota / piezas
+
+# Si el título menciona explícitamente la salud de la batería y es menor a
+# este porcentaje, se descarta el anuncio. Si no la menciona, no se penaliza.
+MIN_BATTERY_HEALTH = 78
 EXCLUDE_KEYWORDS = [
     "piezas", "roto", "no enciende", "para repuestos", "estropeado",
     "dañad", "bloqueado", "mal estado",

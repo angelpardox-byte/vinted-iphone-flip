@@ -9,7 +9,7 @@ import re
 from config import (
     MODELS, STORAGE_VARIANTS, PCT_BELOW_AVG, MANUAL_THRESHOLDS,
     MIN_SAMPLES_FOR_AVG, MIN_PRICE_SANITY, EXCLUDE_KEYWORDS,
-    ACCESSORY_KEYWORDS, EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE,
+    ACCESSORY_KEYWORDS, EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE, MIN_BATTERY_HEALTH,
 )
 
 # Modelos ordenados de más largo a más corto para no confundir
@@ -47,14 +47,38 @@ _ACCESSORY_RE = re.compile(
 )
 
 
+_BATTERY_RE = re.compile(
+    r"(?:bater[ií]a|battery|salud)[^%\d]{0,15}(\d{1,3})\s*%"
+    r"|(\d{1,3})\s*%[^%\d]{0,15}(?:bater[ií]a|battery|salud)",
+    re.IGNORECASE,
+)
+
+
+def extract_battery_health(title: str):
+    """Busca un porcentaje de batería cerca de la palabra "batería"/"battery"/
+    "salud" (en cualquier orden: "batería al 85%" o "85% de batería").
+    Devuelve None si el título no menciona la batería en absoluto."""
+    match = _BATTERY_RE.search(title)
+    if not match:
+        return None
+    value = match.group(1) or match.group(2)
+    pct = int(value)
+    return pct if 0 <= pct <= 100 else None
+
+
 def is_suspicious(listing: dict) -> bool:
-    """Precio irrisorio o palabras de mal estado: se descarta siempre,
-    aunque el título deje clara la capacidad (un iPhone roto sigue siendo
-    un iPhone roto aunque diga "128GB")."""
+    """Precio irrisorio, palabras de mal estado, o batería confirmada por
+    debajo del mínimo: se descarta siempre, aunque el título deje clara la
+    capacidad (un iPhone roto sigue siendo un iPhone roto aunque diga
+    "128GB"). Si NO menciona la batería, no se penaliza — solo se exige el
+    mínimo cuando el propio anuncio la declara."""
     title = listing["title"].lower()
     if listing["price"] < MIN_PRICE_SANITY:
         return True
     if any(kw in title for kw in EXCLUDE_KEYWORDS):
+        return True
+    battery = extract_battery_health(listing["title"])
+    if battery is not None and battery < MIN_BATTERY_HEALTH:
         return True
     return False
 
