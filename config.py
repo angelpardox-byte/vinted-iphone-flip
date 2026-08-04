@@ -57,7 +57,7 @@ MIN_PRICE_SANITY = 60      # € — por debajo de esto se asume pantalla rota /
 MIN_BATTERY_HEALTH = 78
 EXCLUDE_KEYWORDS = [
     "piezas", "roto", "no enciende", "para repuestos", "estropeado",
-    "dañad", "bloqueado", "mal estado",
+    "dañad", "bloqueado", "mal estado", "transferencia bancaria",
 ]
 
 # Accesorios que mencionan el modelo en el título pero no son el móvil en sí
