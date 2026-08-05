@@ -83,8 +83,17 @@ EXTRA_DISCOUNT_FOR_UNKNOWN_STORAGE = 0.10
 # verdad parece el móvil real (y no un accesorio/pieza/anuncio dudoso).
 # Si no hay clave configurada, se usa el margen extra de arriba como respaldo.
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
-MAX_AI_CALLS_PER_RUN = 8   # tope duro de consultas a la IA por cada pasada
+ANTHROPIC_MODEL = "claude-sonnet-5"
+MAX_AI_CALLS_PER_RUN = 30   # tope duro de consultas a la IA por cada pasada
+
+# ── Revisión final con foto para cada chollo candidato ──────────────────
+# Antes de notificar cualquier chollo (ya filtrado por precio y vendedor
+# fiable), Claude revisa también la foto real del anuncio para confirmar
+# que es genuino: que coincide con el modelo/estado descrito, que no se
+# ve dañado, que no es una foto de stock o de otro producto. Si Claude no
+# está disponible o falla, se notifica igualmente (respaldo: el criterio
+# de las reglas, como hasta ahora).
+AI_PHOTO_REVIEW_ENABLED = True
 
 # ── Scraping ──────────────────────────────────────────────────────────────
 SEARCH_INTERVAL_SECONDS = 90       # cada cuánto relanza las búsquedas

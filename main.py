@@ -18,13 +18,13 @@ from datetime import datetime
 
 from config import (
     MODELS, SEARCH_INTERVAL_SECONDS, MIN_SELLER_ITEMS_SOLD,
-    MIN_SELLER_REPUTATION, MAX_AI_CALLS_PER_RUN,
+    MIN_SELLER_REPUTATION, MAX_AI_CALLS_PER_RUN, AI_PHOTO_REVIEW_ENABLED,
 )
 from vinted_client import VintedClient
 from storage import get_connection, already_seen, save_listing, get_average_price, get_average_price_by_model
 from analyzer import evaluate_listing
 from notifier import send_telegram_message, format_deal_message
-from ai_reviewer import judge_listing
+from ai_reviewer import judge_listing, judge_deal_with_photo
 
 
 def log(msg: str):
@@ -52,8 +52,10 @@ def seller_is_trustworthy(client: VintedClient, listing: dict) -> bool:
 
 
 def make_ai_judge():
-    """Envuelve judge_listing con un tope duro de llamadas por pasada,
-    para que un pico de anuncios ambiguos nunca dispare el gasto."""
+    """Envuelve judge_listing y judge_deal_with_photo con un tope duro de
+    llamadas por pasada COMPARTIDO entre ambos usos (título ambiguo y
+    revisión final con foto), para que un pico de anuncios nunca dispare
+    el gasto."""
     calls_made = {"n": 0}
 
     def judge(listing, model_hint):
@@ -62,13 +64,19 @@ def make_ai_judge():
         calls_made["n"] += 1
         return judge_listing(listing, model_hint)
 
-    return judge
+    def photo_review(listing, model, storage, avg_price, discount):
+        if not AI_PHOTO_REVIEW_ENABLED or calls_made["n"] >= MAX_AI_CALLS_PER_RUN:
+            return None
+        calls_made["n"] += 1
+        return judge_deal_with_photo(listing, model, storage, avg_price, discount)
+
+    return judge, photo_review
 
 
 def run_once(client: VintedClient, conn):
     total_new = 0
     total_deals = 0
-    ai_judge = make_ai_judge()
+    ai_judge, ai_photo_review = make_ai_judge()
 
     for model in MODELS:
         try:
@@ -95,7 +103,16 @@ def run_once(client: VintedClient, conn):
             notify = False
             if verdict["is_deal"]:
                 if seller_is_trustworthy(client, listing):
-                    notify = True
+                    review = ai_photo_review(listing, verdict["model"], verdict["storage"],
+                                              verdict["avg_price"], verdict["discount"])
+                    if review is None or review["confirmed"]:
+                        notify = True
+                        if review is not None:
+                            verdict["reason"] += f" — revisado por IA (foto): {review['reason']}"
+                    else:
+                        log(f"Chollo descartado por revisión de IA con foto: "
+                            f"{verdict['model']} {verdict['storage']} a {listing['price']}€ "
+                            f"({review['reason']})")
                 else:
                     log(f"Chollo descartado por vendedor sin historial fiable: "
                         f"{verdict['model']} {verdict['storage']} a {listing['price']}€ "
